@@ -621,7 +621,49 @@ Draft7Validator = create(
     version="draft7",
 )
 
-_LATEST_VERSION = Draft7Validator
+Draft8Validator = create(
+    meta_schema=_utils.load_schema("draft8"),
+    validators={
+        u"$ref": _validators.ref,
+        u"additionalItems": _validators.additionalItems,
+        u"additionalProperties": _validators.additionalProperties,
+        u"allOf": _validators.allOf,
+        u"anyOf": _validators.anyOf,
+        u"const": _validators.const,
+        u"contains": _validators.contains,
+        u"dependencies": _validators.dependencies,
+        u"enum": _validators.enum,
+        u"exclusiveMaximum": _validators.exclusiveMaximum,
+        u"exclusiveMinimum": _validators.exclusiveMinimum,
+        u"format": _validators.format,
+        u"if": _validators.if_,
+        u"items": _validators.items,
+        u"maxItems": _validators.maxItems,
+        u"maxLength": _validators.maxLength,
+        u"maxProperties": _validators.maxProperties,
+        u"maximum": _validators.maximum,
+        u"minItems": _validators.minItems,
+        u"minLength": _validators.minLength,
+        u"minProperties": _validators.minProperties,
+        u"minimum": _validators.minimum,
+        u"multipleOf": _validators.multipleOf,
+        u"oneOf": _validators.oneOf,
+        u"not": _validators.not_,
+        u"pattern": _validators.pattern,
+        u"patternProperties": _validators.patternProperties,
+        u"properties": _validators.properties,
+        u"propertyNames": _validators.propertyNames,
+        u"required": _validators.required,
+        u"type": _validators.type,
+        u"unevaluatedItems": _validators.unevaluatedItems,
+        u"unevaluatedProperties": _validators.unevaluatedProperties,
+        u"uniqueItems": _validators.uniqueItems,
+    },
+    type_checker=_types.draft8_type_checker,
+    version="draft8",
+)
+
+_LATEST_VERSION = Draft8Validator
 
 
 class RefResolver(object):

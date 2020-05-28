@@ -24,6 +24,7 @@ from jsonschema.validators import (
     Draft4Validator,
     Draft6Validator,
     Draft7Validator,
+    Draft8Validator,
     RefResolver,
     validate,
 )

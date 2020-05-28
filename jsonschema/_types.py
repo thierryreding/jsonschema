@@ -186,3 +186,4 @@ draft6_type_checker = draft4_type_checker.redefine(
     ),
 )
 draft7_type_checker = draft6_type_checker
+draft8_type_checker = draft7_type_checker
