@@ -76,6 +76,50 @@ class additionalProperties(Validator):
                 yield ValidationError(error % extras_msg(extras))
 
 
+class unevaluatedItems(Validator):
+    def evaluate(self, validator, uI, instance, schema):
+        return {}
+
+    def validate(self, validator, uI, instance, schema):
+        pass
+
+
+class unevaluatedProperties(Validator):
+    def evaluate(self, validator, uP, instance, schema):
+        return {}
+
+    def validate(self, validator, uP, instance, schema):
+        if not validator.is_type(instance, "object"):
+            return
+
+        obj = validator.evaluate(instance, schema)
+
+        if "properties" in obj:
+            evaluated = list(obj["properties"].keys())
+            available = list(instance.keys())
+            extras = []
+
+            patterns = "|".join(schema.get("patternProperties", {}))
+
+            # check properties in nodes against evaluated properties
+            for prop in available:
+                if prop not in evaluated:
+                    # patternProperties can match any properties that haven't
+                    # been evaluated
+                    if patterns and re.search(patterns, prop):
+                        continue
+
+                    extras.append(prop)
+
+            if validator.is_type(uP, "object"):
+                for extra in extras:
+                    for error in validator.descend(instance[extra], uP, path = extra):
+                        yield error
+            elif not uP and extras:
+                error = "Unevaluated properties are not allowed (%s %s unexpected)"
+                yield ValidationError(error % extras_msg(extras))
+
+
 class items(Validator):
     def evaluate(self, validator, items, instance, schema):
         obj = { "items": [] }
