@@ -5,6 +5,7 @@ from jsonschema._utils import (
     equal,
     extras_msg,
     find_additional_properties,
+    merge,
     types_msg,
     unbool,
     uniq,
@@ -13,6 +14,9 @@ from jsonschema.exceptions import FormatError, ValidationError
 from jsonschema.compat import iteritems
 
 class Validator:
+    def evaluate(self, validator, subschema, instance, schema):
+        return {}
+
     def validate(self, validator, subschema, instance, schema):
         pass
 
@@ -73,6 +77,26 @@ class additionalProperties(Validator):
 
 
 class items(Validator):
+    def evaluate(self, validator, items, instance, schema):
+        obj = { "items": [] }
+
+        if not validator.is_type(instance, "array"):
+            return obj
+
+        if validator.is_type(items, "array"):
+            if len(items) == 1 and len(instance) > 1:
+                items = items * len(instance)
+
+            for (index, item), subschema in zip(enumerate(instance), items):
+                subobj = validator.evaluate(item, subschema)
+                obj["items"].append(subobj)
+        else:
+            for index, item in enumerate(instance):
+                subobj = validator.evaluate(item, items)
+                obj["items"].append(subobj)
+
+        return obj
+
     def validate(self, validator, items, instance, schema):
         if not validator.is_type(instance, "array"):
             return
@@ -111,6 +135,9 @@ class additionalItems(Validator):
 
 
 class const(Validator):
+    def evaluate(self, validator, const, instance, schema):
+        return { "const": const }
+
     def validate(self, validator, const, instance, schema):
         if not equal(instance, const):
             yield ValidationError("%r was expected" % (const,))
@@ -165,6 +192,14 @@ class minimum(Validator):
 
 
 class maximum(Validator):
+    def evaluate(self, validator, maximum, instance, schema):
+        obj = {}
+
+        if instance <= maximum:
+            obj = { "const": instance }
+
+        return obj
+
     def validate(self, validator, maximum, instance, schema):
         if not validator.is_type(instance, "number"):
             return
@@ -191,12 +226,18 @@ class multipleOf(Validator):
 
 
 class minItems(Validator):
+    def evaluate(self, validator, mI, instance, schema):
+        return { "minItems": mI }
+
     def validate(self, validator, mI, instance, schema):
         if validator.is_type(instance, "array") and len(instance) < mI:
             yield ValidationError("%r is too short" % (instance,))
 
 
 class maxItems(Validator):
+    def evaluate(self, validator, mI, instance, schema):
+        return { "maxItems": mI }
+
     def validate(self, validator, mI, instance, schema):
         if validator.is_type(instance, "array") and len(instance) > mI:
             yield ValidationError("%r is too long" % (instance,))
@@ -213,6 +254,9 @@ class uniqueItems(Validator):
 
 
 class pattern(Validator):
+    def evaluate(self, validator, patrn, instance, schema):
+        return { "const": instance }
+
     def validate(self, validator, patrn, instance, schema):
         if (
             validator.is_type(instance, "string") and
@@ -274,6 +318,24 @@ class enum(Validator):
 
 
 class ref(Validator):
+    def evaluate(self, validator, ref, instance, schema):
+        obj = {}
+
+        resolve = getattr(validator.resolver, "resolve", None)
+        if resolve is None:
+            with validator.resolver.resolving(ref) as resolved:
+                obj = validator.evaluate(instance, resolved)
+        else:
+            scope, resolved = validator.resolver.resolve(ref)
+            validator.resolver.push_scope(scope)
+
+            try:
+                obj = validator.evaluate(instance, resolved)
+            finally:
+                validator.resolver.pop_scope()
+
+        return obj
+
     def validate(self, validator, ref, instance, schema):
         resolve = getattr(validator.resolver, "resolve", None)
         if resolve is None:
@@ -300,6 +362,19 @@ class type(Validator):
 
 
 class properties(Validator):
+    def evaluate(self, validator, properties, instance, schema):
+        obj = { "properties": {} }
+
+        if not validator.is_type(instance, "object"):
+            return obj
+
+        for property, subschema in iteritems(properties):
+            if property in instance:
+                subobj = validator.evaluate(instance[property], subschema)
+                obj["properties"][property] = subobj
+
+        return obj
+
     def validate(self, validator, properties, instance, schema):
         if not validator.is_type(instance, "object"):
             return
@@ -341,6 +416,16 @@ class maxProperties(Validator):
 
 
 class allOf(Validator):
+    def evaluate(self, validator, allOf, instance, schema):
+        obj = {}
+
+        for index, subschema in enumerate(allOf):
+            subobj = validator.evaluate(instance, subschema)
+            for k, v in subobj.items():
+                merge(obj, subobj)
+
+        return obj
+
     def validate(self, validator, allOf, instance, schema):
         for index, subschema in enumerate(allOf):
             for error in validator.descend(instance, subschema, schema_path=index):
@@ -363,6 +448,21 @@ class anyOf(Validator):
 
 
 class oneOf(Validator):
+    def evaluate(self, validator, oneOf, instance, schema):
+        obj = {}
+
+        subschemas = enumerate(oneOf)
+
+        for index, subschema in subschemas:
+            if validator.is_valid(instance, subschema):
+                subobj = validator.evaluate(instance, subschema)
+                merge(obj, subobj)
+
+                # XXX fail to evaluate for multiple matches?
+                break
+
+        return obj
+
     def validate(self, validator, oneOf, instance, schema):
         subschemas = enumerate(oneOf)
         all_errors = []
@@ -396,6 +496,17 @@ class not_(Validator):
 
 
 class if_(Validator):
+    def evaluate(self, validator, if_schema, instance, schema):
+        obj = {}
+
+        if validator.is_valid(instance, if_schema):
+            if u"then" in schema:
+                obj = validator.evaluate(instance, schema[u"then"])
+        elif u"else" in schema:
+            obj = validator.evaluate(instance, schema[u"else"])
+
+        return obj
+
     def validate(self, validator, if_schema, instance, schema):
         if validator.is_valid(instance, if_schema):
             if u"then" in schema:

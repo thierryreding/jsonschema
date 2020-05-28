@@ -293,6 +293,41 @@ def create(
             for error in cls(cls.META_SCHEMA).iter_errors(schema):
                 raise exceptions.SchemaError.create_from(error)
 
+        def evaluate(self, instance, _schema = None):
+            obj = {}
+
+            if _schema is None:
+                _schema = self.schema
+
+            if _schema is True:
+                return obj
+
+            if _schema is False:
+                return obj
+
+            scope = id_of(_schema)
+            if scope:
+                self.resolver.push_scope(scope)
+            try:
+                ref = _schema.get(u"$ref")
+                if ref is not None:
+                    validators = [(u"$ref", ref)]
+                else:
+                    validators = iteritems(_schema)
+
+                for k, v in validators:
+                    validator = self.VALIDATORS.get(k)
+                    if validator is None:
+                        continue
+
+                    subobj = validator().evaluate(self, v, instance, _schema)
+                    _utils.merge(obj, subobj)
+            finally:
+                if scope:
+                    self.resolver.pop_scope()
+
+            return obj
+
         def iter_errors(self, instance, _schema=None):
             if _schema is None:
                 _schema = self.schema

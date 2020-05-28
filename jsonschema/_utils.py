@@ -210,3 +210,20 @@ def uniq(container):
                     return False
                 seen.append(e)
     return True
+
+def merge(a, b, path = None):
+    if path is None:
+        path = []
+
+    for key in b.keys():
+        if key in a:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                merge(a[key], b[key], path + [ str(key) ])
+            elif a[key] == b[key]:
+                pass
+            else:
+                a[key] = b[key]
+        else:
+            a[key] = b[key]
+
+    return a
