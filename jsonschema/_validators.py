@@ -21,6 +21,20 @@ class Validator:
         pass
 
 class patternProperties(Validator):
+    def evaluate(self, validator, patternProperties, instance, schema):
+        obj = { "properties": {} }
+
+        if not validator.is_type(instance, "object"):
+            return obj
+
+        for pattern, subschema in iteritems(patternProperties):
+            for prop in instance.keys():
+                if re.search(pattern, prop):
+                    subobj = validator.evaluate(instance[prop], subschema)
+                    obj["properties"][prop] = subobj
+
+        return obj
+
     def validate(self, validator, patternProperties, instance, schema):
         if not validator.is_type(instance, "object"):
             return
@@ -99,16 +113,9 @@ class unevaluatedProperties(Validator):
             available = list(instance.keys())
             extras = []
 
-            patterns = "|".join(schema.get("patternProperties", {}))
-
             # check properties in nodes against evaluated properties
             for prop in available:
                 if prop not in evaluated:
-                    # patternProperties can match any properties that haven't
-                    # been evaluated
-                    if patterns and re.search(patterns, prop):
-                        continue
-
                     extras.append(prop)
 
             if validator.is_type(uP, "object"):
